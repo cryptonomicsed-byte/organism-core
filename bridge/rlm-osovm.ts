@@ -18,10 +18,15 @@ export interface DispatchMessage {
 
 export interface VMResult {
   vm_task_hash: string;
-  f1_score: number;
-  ase_minted: number;
+  // f1_score/ase_minted removed: OSOVM's cli.jl used to hardcode these to
+  // fake constants on every call regardless of outcome. That was fixed
+  // (OSOVM commit history, task #52) -- the real CLI now returns
+  // vm_result (the actual per-opcode outcome) and sender_balance instead.
+  // This interface was left stale, silently reading `undefined` for both
+  // fields on every real call. Fixed to match the current real contract.
   vm_result: any;
-  status: 'success' | 'error' | 'simulated';
+  sender_balance: number;
+  status: 'success' | 'failed' | 'error' | 'simulated';
 }
 
 /**
@@ -31,7 +36,11 @@ export async function executeTask(msg: DispatchMessage): Promise<VMResult> {
   const forceReal = process.env.FORCE_REAL_VM === 'true' || process.env.REALLY_BREATHE === 'true';
   console.log(`[Organism] Executing VM Task: ${msg.opcode} for agent ${msg.agent_pubkey.slice(0, 10)}...`);
 
-  const cliPath = path.resolve(__dirname, '../../osovm/src/cli.jl');
+  // Was lowercase 'osovm' -- the real directory on disk is 'OSOVM'.
+  // Case-insensitive on macOS (why this went unnoticed), but the VPS this
+  // now runs on is Linux (case-sensitive), so every real call silently
+  // failed and fell through to the simulation fallback below.
+  const cliPath = path.resolve(__dirname, '../../OSOVM/src/cli.jl');
   const taskJson = JSON.stringify({
     opcode: msg.opcode,
     args: msg.payload
@@ -45,11 +54,11 @@ export async function executeTask(msg: DispatchMessage): Promise<VMResult> {
     ]);
 
     const result: VMResult = JSON.parse(stdout);
-    if (result.status === 'error') {
-      throw new Error(`VM Execution Error: ${(result as any).error}`);
+    if (result.status === 'error' || result.status === 'failed') {
+      throw new Error(`VM Execution Error: ${(result as any).error ?? JSON.stringify(result.vm_result)}`);
     }
 
-    console.log(`[Organism] VM Success: Task Hash ${result.vm_task_hash.slice(0, 12)}, F1 Score: ${result.f1_score}`);
+    console.log(`[Organism] VM Success: Task Hash ${result.vm_task_hash.slice(0, 12)}, Sender Balance: ${result.sender_balance}`);
     return result;
 
   } catch (err) {
