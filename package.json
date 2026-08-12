@@ -11,9 +11,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@bino-elgua/swibe": "file:../swibe",
-    "@bino-elgua/omokoda": "file:../omokoda",
-    "@bino-elgua/zangbeto": "file:../zangbeto",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3"
   }
