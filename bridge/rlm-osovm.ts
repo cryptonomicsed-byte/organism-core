@@ -38,6 +38,14 @@ export interface DispatchMessage {
                           // of creating a fresh one-shot VM per call.
 }
 
+// This shape now has a published, live-validated source of truth:
+// GET /v1/openapi.json on the OSOVM server itself (ExecuteResponse /
+// ErrorResponse schemas) -- OSOVM's test/openapi_schema_test.py proves
+// the running server's actual responses match that published schema,
+// so this interface is a manual mirror of a real contract, not the
+// only place the shape is defined. If they ever drift, the openapi.json
+// endpoint is the one to trust; update this interface to match it, not
+// the other way around.
 export interface VMResult {
   vm_task_hash: string;
   vm_result: any;
