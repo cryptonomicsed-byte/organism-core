@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "npx tsx test/one-breath.test.ts",
-    "test:nostr-wire": "tsc bridge/nostr-wire.ts test/nostr-wire.test.ts --outDir .tsbuild --module commonjs --target es2022 --moduleResolution node --strict --skipLibCheck --esModuleInterop && node .tsbuild/test/nostr-wire.test.js"
+    "test:nostr-wire": "tsc bridge/nostr-wire.ts test/nostr-wire.test.ts --outDir .tsbuild --module commonjs --target es2022 --moduleResolution node --strict --skipLibCheck --esModuleInterop && node .tsbuild/test/nostr-wire.test.js",
+    "build": "tsc -p tsconfig.build.json"
   },
   "keywords": [],
   "author": "",
@@ -17,5 +18,18 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.1"
-  }
+  },
+  "exports": {
+    ".": "./index.js",
+    "./bridge/nostr-wire": {
+      "types": "./dist/bridge/nostr-wire.d.ts",
+      "default": "./dist/bridge/nostr-wire.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bridge",
+    "index.js",
+    "README.md"
+  ]
 }
