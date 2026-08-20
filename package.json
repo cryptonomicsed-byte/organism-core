@@ -4,7 +4,8 @@
   "description": "The nerve center for the Technosis Ecosystem",
   "main": "index.js",
   "scripts": {
-    "test": "npx tsx test/one-breath.test.ts"
+    "test": "npx tsx test/one-breath.test.ts",
+    "test:nostr-wire": "npx tsx test/nostr-wire.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -13,5 +14,8 @@
   "dependencies": {
     "tsx": "^4.7.1",
     "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
   }
 }
