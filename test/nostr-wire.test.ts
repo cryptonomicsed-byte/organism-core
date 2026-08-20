@@ -195,7 +195,7 @@ test('an engram carries the d and p tags NIP-AE requires', () => {
     pubkey: PUBKEY,
     ownerPubkey: PUBKEY,
     dTag: 'deadbeef',
-    content: '{"organ":"nex"}',
+    ciphertext: 'AhFakeNip44Ciphertext==',
     extraTags: [['organ', 'nex']],
     createdAt: 1700000000,
   });
@@ -216,7 +216,7 @@ test('an engram refuses a raw slug in place of an HMACd d tag', () => {
         pubkey: PUBKEY,
         ownerPubkey: PUBKEY,
         dTag: '',
-        content: '{}',
+        ciphertext: 'AhFakeNip44Ciphertext==',
       }),
     /must be HMACd by the key owner/,
   );
@@ -241,20 +241,20 @@ test('a claim carries its falsifier and half-life', () => {
   assert.equal(JSON.parse(e.content).half_life_secs, 86400);
 });
 
-test('Yorùbá content round-trips through an engram body intact', () => {
+test('Yorùbá content survives an event body verbatim', () => {
   // Normalisation applies to slugs, never to content: the name a reader wants
   // must survive.
-  const body = JSON.stringify({ orisha: 'Ọ̀rúnmìlà', ritual: 'ọjọ́-rú' });
-  const e = buildEngram({
+  // Applies to any event body the module passes through -- a claim's content
+  // is not encrypted, so the name a reader wants must survive verbatim.
+  const e = buildClaim({
     pubkey: PUBKEY,
-    ownerPubkey: PUBKEY,
-    dTag: 'abc',
-    content: body,
+    statement: 'Ọ̀rúnmìlà governs ọjọ́-rú',
+    falsifier: 'sha256:abc',
     createdAt: 1700000000,
   });
-  const decoded = JSON.parse(e.content);
-  assert.equal(decoded.orisha, 'Ọ̀rúnmìlà');
-  assert.equal(decoded.ritual, 'ọjọ́-rú');
+  assert.ok(e.content.includes('Ọ̀rúnmìlà'));
+  assert.ok(!e.content.includes('\\u'));
+  assert.equal(e.id, eventId(e));
 });
 
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);

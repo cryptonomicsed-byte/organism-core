@@ -241,20 +241,35 @@ export function buildUnsignedEvent(opts: {
 /**
  * Build an unsigned NIP-AE engram (`kind:30174`).
  *
- * `dTag` is the HMAC'd slug. This module cannot compute it — the HMAC key is
- * derived from the agent's secret, which lives with the signer — so the caller
- * supplies it. Passing a raw slug instead would publish it in the clear and
- * defeat the reason minipae hashes it, so a missing `dTag` fails loudly.
+ * ## `ciphertext`, not content — and this module cannot produce it
+ *
+ * NIP-AE engram content is **NIP-44 encrypted under the agent↔owner
+ * conversation key**. That key is `HKDF-extract("nip44-v2", ECDH(secret,
+ * owner))`, so producing it requires the agent's secret — which this module
+ * deliberately does not hold.
+ *
+ * The parameter is therefore named `ciphertext`: the caller encrypts, or the
+ * signing component encrypts as it signs. Passing a plaintext JSON body here
+ * and signing it publishes the whole memory in the clear to every relay
+ * operator. That failure is silent — the event is well-formed, correctly
+ * signed, and accepted — which is exactly why the parameter name says what it
+ * wants rather than leaving it to a doc comment nobody re-reads.
+ *
+ * `dTag` is the HMAC'd slug, keyed by that same conversation key, so it is
+ * equally unavailable here and equally the caller's job. Passing a raw slug
+ * would publish it in the clear and defeat the reason minipae hashes it, so a
+ * missing `dTag` fails loudly.
  */
 export function buildEngram(opts: {
   pubkey: string;
   ownerPubkey: string;
   dTag: string;
-  content: string;
+  /** NIP-44 ciphertext. Never a plaintext body — see the note above. */
+  ciphertext: string;
   extraTags?: Tag[];
   createdAt?: number;
 }): UnsignedEvent {
-  const { pubkey, ownerPubkey, dTag, content, extraTags = [], createdAt } = opts;
+  const { pubkey, ownerPubkey, dTag, ciphertext: content, extraTags = [], createdAt } = opts;
   if (!dTag) {
     throw new Error(
       'dTag is required: the slug must be HMACd by the key owner, never published raw',
