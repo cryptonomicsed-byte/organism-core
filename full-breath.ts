@@ -97,7 +97,7 @@ async function fullBreath() {
   console.log("✅ NOT SABBATH. Proceeding to Reward.");
 
   // --- 7. REWARD (Sui Mint) ---
-  console.log("\n--- PHASE 7: REWARD (ToC/Àṣẹ) ---");
+  console.log("\n--- PHASE 7: REWARD (ToC/Agency) ---");
   
   if (vmResult.f1_score < 90) {
     console.log(`⚠️  F1 Score ${vmResult.f1_score} < 90. No Reward.`);
@@ -120,7 +120,7 @@ async function fullBreath() {
   });
   
   console.log(`✅ MINTED: ${evolve.reward_minted} ToC`);
-  console.log(`✅ MINTED: ${vmResult.ase_minted} Àṣẹ (from VM)`);
+  console.log(`✅ MINTED: ${vmResult.ase_minted} Agency (from VM)`);
   
   console.log("\n✨ FULL BREATH CYCLE COMPLETE.");
 }

@@ -9,7 +9,7 @@ export interface IfaEntropy {
 }
 
 export async function birthAgentFromIfa(entropy: IfaEntropy) {
-  console.log(`[Organism] Birthing agent from Odu pattern: ${entropy.odu.join('')}`);
+  console.log(`[Organism] Birthing agent from Signature pattern: ${entropy.odu.join('')}`);
   
   // Transform binary Odu into a cryptographic keypair seed
   const identitySeed = Buffer.from(entropy.odu.join('') + entropy.seed).toString('hex');
