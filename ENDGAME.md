@@ -158,13 +158,13 @@ Every agent gets an **IP Root** at birth. Every significant creation emits a **C
 | `22242` | NIP-42 relay AUTH | `minipae` | ✅ |
 | GIX `0xF0–0xF4` | GlyphIndex opcodes STORE/EXPAND/SEARCH/ANCHOR/AUDIT | `OSOVM` | ✅ wired |
 
-### New kinds still needed (gaps to spec before building)
+### New kinds (now specced — see `NIPS/31-embodiment-spatial-device.md`)
 
-| Need | Proposed range | Status |
+| Need | Kinds | Status |
 |---|---|---|
-| Embodiment session offer/accept/active/end | `31xxx` app range | ❌ not specced |
-| Spatial mining / delta receipt | `31xxx` app range | ❌ not specced |
-| Device binding / hardware attestation | TBD | ❌ not specced |
+| Embodiment session offer/accept/heartbeat/end | `31000–31003` | ✅ specced (draft) |
+| Spatial mining / delta receipt | `31010` | ✅ specced (draft) |
+| Device binding / hardware attestation | `31020` | ✅ specced (draft) |
 
 ---
 
