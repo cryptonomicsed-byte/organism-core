@@ -7,10 +7,14 @@
  *  2. COMPUTE_PROOF — OSOVM issues VerifiedGPUWork + Dopamine authorisation.
  *  3. AIO record — POST /api/synapse/mint to the AIO service proxy (Sui Move),
  *     anchoring the mint receipt on-chain.  Fire-and-forget, fail-open.
+ *     The AIO body is tagged with the canonical ActionVessel and Odù ID so the
+ *     on-chain receipt carries semantic provenance from the Digital Calabash.
  *
  * Fail-open: on OSOVM or AIO unreachability, returns a synthetic/partial result
  * so downstream callers are not blocked.
  */
+
+import { classifyAction, actionToOduId } from './vessel-classifier';
 
 export interface SoulEvolveEvent {
   soul_id: string;   // Omo-Koda2 agent_id
@@ -66,6 +70,11 @@ async function recordMintOnAio(params: {
   new_rank:       number;
   gpu_seconds:    number;
 }): Promise<string | null> {
+  // Tag the mint with its canonical ActionVessel and Odù ID from the Digital Calabash.
+  // SOUL_EVOLVE → Growth vessel (13) → odu_id 0xD0 (base form, bottom nibble 0).
+  const vessel = classifyAction('SOUL_EVOLVE');
+  const odu_id = actionToOduId('SOUL_EVOLVE');
+
   try {
     const resp = await fetch(`${AIO_BASE}/api/synapse/mint`, {
       method:  'POST',
@@ -78,6 +87,8 @@ async function recordMintOnAio(params: {
         rank_to:        params.new_rank,
         gpu_seconds:    params.gpu_seconds,
         timestamp:      new Date().toISOString(),
+        vessel,
+        odu_id,
       }),
       signal: AbortSignal.timeout(12_000),
     });
