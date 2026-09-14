@@ -50,6 +50,12 @@
       "tech": "TypeScript/Sui/Arweave",
       "input": "question",
       "output": "consensus-verdict"
+    },
+    "RitualCodex": {
+      "role": "sacred-time",
+      "description": "Spiral Calendar — BTC Time + Gregorian convergence, Sabbath gates, ritual weight",
+      "tech": "JavaScript/ESM",
+      "output": "spiral-snapshot"
     }
   },
   "wiring": [
@@ -94,6 +100,13 @@
       "bridge": "bridge/twelve-thrones-consensus.ts",
       "event": "AUDIT_VERIFIED",
       "description": "After audit passes, submit thought for epistemic consensus"
+    },
+    {
+      "from": "RitualCodex",
+      "to": "Organism",
+      "bridge": "bridge/spiral-time-bridge.ts",
+      "event": "SPIRAL_TICK",
+      "description": "Provides sacred time context to all phases — Sabbath gates, ritual weight, archetype alignment"
     }
   ],
   "schemas": {
