@@ -1,13 +1,15 @@
 /**
  * toc-evolve-hook.ts
- * Wiring: Soul evolution event → OSOVM TOC_MINT (0x54) opcode
+ * Wiring: Soul evolution event → OSOVM TOC_MINT (0x54) → AIO Sui on-chain record
  *
- * When an agent's soul rank increases, this hook submits a TOC_MINT
- * instruction to OSOVM via the /run endpoint.  OSOVM is the sole mint
- * authority; it validates is_fully_verified() before minting Synapse.
+ * Flow:
+ *  1. TOC_MINT  — OSOVM validates is_fully_verified() and mints Synapse off-chain.
+ *  2. COMPUTE_PROOF — OSOVM issues VerifiedGPUWork + Dopamine authorisation.
+ *  3. AIO record — POST /api/synapse/mint to the AIO service proxy (Sui Move),
+ *     anchoring the mint receipt on-chain.  Fire-and-forget, fail-open.
  *
- * Fail-open: on OSOVM unreachability, returns a synthetic result so
- * downstream callers are not blocked.
+ * Fail-open: on OSOVM or AIO unreachability, returns a synthetic/partial result
+ * so downstream callers are not blocked.
  */
 
 export interface SoulEvolveEvent {
@@ -23,11 +25,14 @@ export interface TocMintResult {
   dopamine_auth:   number;
   proof_value:     number;
   osovm_event_id?: string;
+  aio_tx_digest?:  string;   // Sui transaction digest from AIO on-chain record
+  aio_recorded:    boolean;
   status: 'MINTED' | 'PENDING' | 'FAILED' | 'INSUFFICIENT_CONTRIBUTION';
   error?: string;
 }
 
-const OSOVM_BASE = process.env.OSOVM_URL ?? 'http://127.0.0.1:7780';
+const OSOVM_BASE = process.env.OSOVM_URL    ?? 'http://127.0.0.1:7780';
+const AIO_BASE   = process.env.AIO_SERVICE_URL ?? 'http://127.0.0.1:7800';
 
 // Synapse reward per rank-level step — preserves original 11.11% reward logic
 const SYNAPSE_PER_RANK = 1111;
@@ -46,6 +51,49 @@ async function callOsovmRun(opcode: string, args: Record<string, unknown>): Prom
   return resp.json();
 }
 
+/**
+ * Record the Synapse mint on-chain via the AIO service proxy (Sui Move contract).
+ * The AIO contract anchors the receipt so the mint is provably tied to an
+ * OSOVM event_id and a rank transition.
+ *
+ * Returns the Sui tx_digest on success, null on any failure (fail-open).
+ */
+async function recordMintOnAio(params: {
+  agent_id:       string;
+  synapse_amount: number;
+  osovm_event_id: string;
+  old_rank:       number;
+  new_rank:       number;
+  gpu_seconds:    number;
+}): Promise<string | null> {
+  try {
+    const resp = await fetch(`${AIO_BASE}/api/synapse/mint`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent_id:       params.agent_id,
+        synapse_amount: params.synapse_amount,
+        osovm_event_id: params.osovm_event_id,
+        rank_from:      params.old_rank,
+        rank_to:        params.new_rank,
+        gpu_seconds:    params.gpu_seconds,
+        timestamp:      new Date().toISOString(),
+      }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!resp.ok) {
+      console.warn(`[toc-evolve-hook] AIO /api/synapse/mint returned ${resp.status}`);
+      return null;
+    }
+    const body = await resp.json() as Record<string, unknown>;
+    const digest = body['tx_digest'] ?? body['digest'] ?? body['transaction_digest'];
+    return digest ? String(digest) : null;
+  } catch (e) {
+    console.warn(`[toc-evolve-hook] AIO unreachable (fail-open): ${e}`);
+    return null;
+  }
+}
+
 export async function onSoulEvolve(event: SoulEvolveEvent): Promise<TocMintResult> {
   const rankDelta = Math.max(0, event.new_rank - event.old_rank);
   if (rankDelta === 0) {
@@ -54,6 +102,7 @@ export async function onSoulEvolve(event: SoulEvolveEvent): Promise<TocMintResul
       synapse_minted: 0,
       dopamine_auth: 0,
       proof_value: 0,
+      aio_recorded: false,
       status: 'PENDING',
     };
   }
@@ -65,7 +114,7 @@ export async function onSoulEvolve(event: SoulEvolveEvent): Promise<TocMintResul
   try {
     // Step 1: TOC_MINT — gate: is_fully_verified() must pass in OSOVM
     const mintResult = await callOsovmRun('TOC_MINT', {
-      agent_id:   event.soul_id,
+      agent_id:    event.soul_id,
       gpu_seconds: gpuSeconds,
     }) as Record<string, unknown>;
 
@@ -75,15 +124,17 @@ export async function onSoulEvolve(event: SoulEvolveEvent): Promise<TocMintResul
         synapse_minted: 0,
         dopamine_auth: 0,
         proof_value: 0,
+        aio_recorded: false,
         status: 'INSUFFICIENT_CONTRIBUTION',
         error: String(mintResult['error'] ?? 'is_fully_verified() gate failed'),
       };
     }
 
-    const synapseMinted = Number(mintResult['synapse_minted'] ?? 0);
+    const synapseMinted  = Number(mintResult['synapse_minted'] ?? 0);
+    const osovmEventId   = String(mintResult['event_id'] ?? '');
 
     // Step 2: COMPUTE_PROOF — authorize Dopamine proportional to proof quality
-    let proofValue = 0;
+    let proofValue   = 0;
     let dopamineAuth = 0;
     try {
       const proofResult = await callOsovmRun('COMPUTE_PROOF', {
@@ -104,12 +155,25 @@ export async function onSoulEvolve(event: SoulEvolveEvent): Promise<TocMintResul
       // COMPUTE_PROOF failure doesn't block Synapse mint
     }
 
+    // Step 3: AIO on-chain record — anchor the mint receipt on Sui.
+    // Fire-and-forget: aio_recorded=false is acceptable; mint already happened.
+    const aioTxDigest = await recordMintOnAio({
+      agent_id:       event.soul_id,
+      synapse_amount: synapseMinted,
+      osovm_event_id: osovmEventId,
+      old_rank:       event.old_rank,
+      new_rank:       event.new_rank,
+      gpu_seconds:    gpuSeconds,
+    });
+
     return {
       soulId:          event.soul_id,
       synapse_minted:  synapseMinted,
       dopamine_auth:   dopamineAuth,
       proof_value:     proofValue,
-      osovm_event_id:  String(mintResult['event_id'] ?? ''),
+      osovm_event_id:  osovmEventId,
+      aio_tx_digest:   aioTxDigest ?? undefined,
+      aio_recorded:    aioTxDigest !== null,
       status:          'MINTED',
     };
 
@@ -122,6 +186,7 @@ export async function onSoulEvolve(event: SoulEvolveEvent): Promise<TocMintResul
       synapse_minted: syntheticSynapse,
       dopamine_auth:  0,
       proof_value:    0,
+      aio_recorded:   false,
       status:         'PENDING',
       error:          `OSOVM offline — synapse_minted=${syntheticSynapse} pending confirmation`,
     };
