@@ -3,7 +3,7 @@
  * Wiring: Omokoda (parliamentary mind) → ÒSỌ́VM (execution opcodes)
  *
  * This bridge now speaks to OSOVM's real HTTP server (src/server.jl,
- * port 7778) as the primary path -- OSOVM previously had no network
+ * port 7780) as the primary path -- OSOVM previously had no network
  * door at all; every prior call here was a local `julia cli.jl`
  * subprocess on the same box. That subprocess call remains as a real
  * (not simulated) fallback if the HTTP server is unreachable, since
@@ -19,7 +19,7 @@ import * as path from 'path';
 
 const exec = promisify(execFile);
 
-const OSOVM_HTTP_URL = process.env.OSOVM_HTTP_URL || 'http://localhost:7778';
+const OSOVM_HTTP_URL = process.env.OSOVM_HTTP_URL || 'http://localhost:7780';
 // 10s default, not 5s: Julia JIT-compiles each HTTP handler code path on
 // its first real hit (observed throughout this session -- cold-start
 // costs of 1-2s+ are normal here, not a hang), so the first request
